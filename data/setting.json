@@ -1,0 +1,164 @@
+{
+    "debug": "ON",
+    "multiUser": true,
+    "maxUser": 3,
+    "condition": {
+        "nanido": {
+            "A1": "checked",
+            "A2": "checked",
+            "B1": "checked",
+            "B2": "checked"
+        },
+        "hinsi": {
+            "noun": [
+                "名詞",
+                "checked"
+            ],
+            "verb": [
+                "動詞",
+                "checked"
+            ],
+            "adjective": [
+                "形容詞",
+                "checked"
+            ],
+            "preposition": [
+                "前置詞",
+                "checked"
+            ],
+            "adverb": [
+                "副詞",
+                "checked"
+            ],
+            "conjunction": [
+                "接続詞",
+                "checked"
+            ],
+            "pronoun": [
+                "代名詞",
+                "checked"
+            ],
+            "number": [
+                "数詞",
+                "checked"
+            ],
+            "determiner": [
+                "冠詞",
+                "checked"
+            ],
+            "beVerb": [
+                "be動詞",
+                "checked"
+            ],
+            "doVerb": [
+                "do動詞",
+                "checked"
+            ],
+            "haveVerb": [
+                "have動詞",
+                "checked"
+            ],
+            "modalAuxiliary": [
+                "助動詞",
+                "checked"
+            ],
+            "interjection": [
+                "間投詞",
+                "checked"
+            ],
+            "infinitiveTo": [
+                "不定詞",
+                "checked"
+            ],
+            "other": [
+                "他",
+                "checked"
+            ]
+        },
+        "shuffle": "checked",
+        "proficiency": {
+            "elap0To1": [
+                "0秒以上1秒未満",
+                "checked"
+            ],
+            "elap1To2": [
+                "1秒以上2秒未満",
+                "checked"
+            ],
+            "elap2To5": [
+                "2秒以上5秒未満",
+                "checked"
+            ],
+            "elap5To9": [
+                "5秒以上9秒未満",
+                "checked"
+            ],
+            "elap9sToMax": [
+                "9秒以上",
+                "checked"
+            ]
+        },
+        "dayElapsed": {
+            "last1d": [
+                "1日未満",
+                "checked"
+            ],
+            "last10d": [
+                "10日未満",
+                "checked"
+            ],
+            "done": [
+                "確認済み",
+                "checked"
+            ],
+            "notd": [
+                "未確認",
+                "checked"
+            ],
+            "nota": [
+                "対象外",
+                "checked"
+            ]
+        },
+        "question": "6"
+    },
+    "test": "OFF",
+    "testPattern": "1",
+    "nodejs": {
+        "port": "8081",
+        "urlBase": "http://localhost",
+        "urlAjaxGetQuestion": "/ajax/getQuestion",
+        "urlAjaxDownload": "/ajax/download",
+        "urlAjaxUpload": "/ajax/upload"
+    },
+    "commonClSv": {
+        "//問題インデックス": "//",
+        "indexQuestion": "indexQuestion",
+        "//単語": "//",
+        "headword": "headword",
+        "//経過時間": "//",
+        "timeAnswer": "timeAnswer",
+        "//難易度": "//",
+        "nanido": "nanido",
+        "//品詞": "//",
+        "hinsi": "hinsi",
+        "//シャッフル": "//",
+        "shuffle": "shuffle",
+        "//習熟度": "//",
+        "proficiency": "proficiency",
+        "//確認経過日数": "//",
+        "dayElapsed": "dayElapsed",
+        "//最大問題数": "//",
+        "question": "question",
+        "//停止": "//",
+        "stop": "stop",
+        "//ファイル": "//",
+        "file": "file",
+        "//答え": "//",
+        "answer": "answer",
+        "//問題数": "//",
+        "countQuestion": "countQuestion",
+        "//セッショントークン": "//",
+        "token": "token"
+    }
+}

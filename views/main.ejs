@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Remember Speed Trainner</title>
+    <script src="jquery-3.6.0.min.js"></script>
+    <script>
+        /**
+         * デバッグモード
+         * クライアントでデバッグしやすくするため
+         * @static
+         */
+        var Debug;
+
+        //デバッグ動作ラッパー(値用)
+        function DEBUGForValue(header, content) {
+            //デバッグモードか
+            if (Debug == "<%= AppConst.ON %>") {
+                console.debug("[DEBUG]" + header + ": " + content);
+            }
+
+            return;
+        }
+
+        //デバッグ動作ラッパー(メッセージ用)
+        function DEBUGForMessage(message) {
+            //デバッグモードか
+            if (Debug == "<%= AppConst.ON %>") {
+                console.debug("[DEBUG]" + message);
+            }
+
+            return;
+        }
+
+        /**
+         * 致命的エラー
+         * エラー情報を出力して終了する。
+         * (throwでお試し)
+         * @constructor
+         * @param {string} func 関数名
+         * @param {object} errorInfo エラー情報
+         */
+        function fatal(func, errorInfo) {
+            console.error("function: " + func);
+            console.error(errorInfo);
+            throw arguments.callee.name;
+        }
+
+        var ajaxParam = {};
+        var condParam = {};
+        var timeAnswer = -1;
+        var indexQuestion = 0;
+        var timer = -1;
+        var jsonRes;
+        var isAnswering;
+        var session = null;
+        var countQuestion;
+
+        //ajaxのクエリを作成
+        function makeQuery(index) {
+            let ret = "?";
+
+            ajaxParam["<%= Setting.commonClSv.indexQuestion %>"] = indexQuestion;
+
+            //全要素を連結するループ
+            for (const key in ajaxParam) {
+                ret += key + "=" + ajaxParam[key] + "&";
+            }
+
+            ret = ret.substr(0, ret.length - 1);
+            return ret;
+        }
+
+        //ajax呼び出し
+        async function syncAjax(params) {
+            return new Promise(
+                /**
+                    * ajaxを呼び出す。
+                    * 同期化を考慮している。
+                    * (待たせる方)
+                    * @param resolve 成功コールバック
+                    * @param reject 失敗コールバック
+                    */
+                (resolve, reject) => {
+                    $.ajax(
+                        {
+                            url: params.url,
+                            type: params.hasOwnProperty("method") ? params.method : "get",
+                            data: params.hasOwnProperty("data") ? params.data : null,
+                            contentType: params.hasOwnProperty("method") ? false : null,
+                            processData: params.hasOwnProperty("method") ? false : null,
+                            headers: session == null ? {} : { "Authentication": "Bearer " + session },
+                            error:
+                                /**
+                                * ajaxのerrorコールバック
+                                * @param {jqXHR} jqXHR ajaxから引用
+                                * @param {string} textStatus ajaxから引用
+                                * @param {string} errorThrown ajaxから引用
+                                */
+                                (jqXHR, textStatus, errorThrown) => {
+                                    console.error("ERROR:" + params.url);
+                                    console.error(jqXHR);
+                                    console.error(textStatus);
+                                    console.error(errorThrown);
+                                    reject({ jqXHR, textStatus, errorThrown });
+                                },
+                            success:
+                                /**
+                                * ajaxのsuccessコールバック
+                                * @param {object} data ajaxから引用
+                                */
+                                (data) => {
+                                    resolve(data);
+                                }
+                        });
+                });
+        }
+
+        //ajax呼び出し準備
+        async function callAjax(params) {
+            //呼び出すajaxの分岐
+            switch (params.order) {
+                case "getQuestion": {
+                    //ajaxのクエリを作成
+                    let query = makeQuery();
+
+                    params["url"] = "<%= Setting.nodejs.urlAjaxGetQuestion %>";
+                    params["url"] += query;
+                    break;
+                }
+                case "download": {
+                    params["url"] = "<%= Setting.nodejs.urlAjaxDownload %>";
+                    break;
+                }
+                case "upload": {
+                    params["url"] = "<%= Setting.nodejs.urlAjaxUpload %>";
+                    break;
+                }
+                default: {
+                    //###
+                    break;
+                }
+            }
+
+            DEBUGForValue("params[\"url\"]", params["url"]);
+
+            //ajax呼び出し
+            let ret = await syncAjax(params);
+
+            return ret;
+        }
+
+        //form制御
+        function controlForm(params) {
+            let form;
+
+            //ボタン分岐
+            switch (params) {
+                case "stop":
+                    {
+                        document.getElementById("buttonStop").disabled = true;
+                        document.getElementById("buttonNext").disabled = true;
+                        document.getElementById("buttonAnswer").disabled = true;
+                        document.getElementById("buttonStart").disabled = false;
+                        document.getElementById("buttonDownload").disabled = false;
+                        document.getElementById("buttonUpload").disabled = false;
+                        form = document.getElementsByTagName("form");
+
+                        //チェックボックスを操作不可にするループ
+                        for (const iterator of form[0]) {
+                            if (iterator.id.startsWith("cond_")) {
+                                iterator.disabled = false;
+                            }
+                        }
+
+                        break;
+                    }
+                case "start":
+                    {
+                        document.getElementById("buttonStop").disabled = false;
+                        document.getElementById("buttonNext").disabled = false;
+                        document.getElementById("buttonAnswer").disabled = false;
+                        document.getElementById("buttonStart").disabled = true;
+                        document.getElementById("buttonDownload").disabled = true;
+                        document.getElementById("buttonUpload").disabled = true;
+                        document.getElementById("history").value = "";
+                        form = document.getElementsByTagName("form");
+
+                        //チェックボックスを操作可にするループ
+                        for (const iterator of form[0]) {
+                            if (iterator.id.startsWith("cond_")) {
+                                iterator.disabled = true;
+                            }
+                        }
+
+                        break;
+                    }
+                default:
+                    {
+                        //###
+                        break;
+                    }
+            }
+        }
+
+        //初期化
+        function initialize() {
+            Debug = "<%= Setting.debug %>";
+
+            document.getElementById("cond_question").selectedIndex = Number("<%= Setting.condition.question %>");
+            document.getElementById("buttonStart").addEventListener("click", buttonStartHandler);
+            document.getElementById("buttonStop").addEventListener("click", buttonStopHandler);
+            document.getElementById("buttonDownload").addEventListener("click", buttonDownloadHandler);
+            document.getElementById("buttonUpload").addEventListener("click", buttonUploadHandler);
+            document.getElementById("buttonNext").addEventListener("click", buttonNextHandler);
+            document.getElementById("buttonAnswer").addEventListener("click", buttonAnswerHandler);
+            document.getElementById("buttonNanidoAllOn").addEventListener("click", controlCheckbox);
+            document.getElementById("buttonNanidoAllOff").addEventListener("click", controlCheckbox);
+            document.getElementById("buttonHinsiAllOn").addEventListener("click", controlCheckbox);
+            document.getElementById("buttonHinsiAllOff").addEventListener("click", controlCheckbox);
+            document.getElementById("buttonProficiencyAllOn").addEventListener("click", controlCheckbox);
+            document.getElementById("buttonProficiencyAllOff").addEventListener("click", controlCheckbox);
+            document.getElementById("buttonDayElapsedAllOn").addEventListener("click", controlCheckbox);
+            document.getElementById("buttonDayElapsedAllOff").addEventListener("click", controlCheckbox);
+            document.getElementById("buttonPronunciation").addEventListener("click", buttonPronunciationHandler);
+            document.getElementById("buttonHelp").addEventListener("click", buttonHelpHandler);
+
+            //form制御
+            controlForm("stop");
+
+            return;
+        }
+
+        //STOPボタンハンドラー
+        async function buttonStopHandler() {
+            //タイマーが使われているか
+            if (timer != -1) {
+                clearTimeout(timer);
+            }
+
+            ajaxParam["<%= Setting.commonClSv.stop %>"] = "";
+
+            //回答後、かつ、2問目以降、かつ、結果情報があるか
+            if ((!isAnswering) && (indexQuestion != 0) && (jsonRes.headword != "-")) {
+                let resultParam = {};
+                resultParam["<%= Setting.commonClSv.headword %>"] = document.getElementById("headword").value;
+                resultParam["<%= Setting.commonClSv.timeAnswer %>"] = timeAnswer.toString();
+                ajaxParam = {
+                    ...resultParam,
+                    ...ajaxParam
+                };
+            }
+
+            //ajax呼び出し準備
+            let ajaxRes = await callAjax({
+                "order": "getQuestion"
+            });
+
+            //form制御
+            controlForm("stop");
+
+            return;
+        }
+
+        //STARTボタンハンドラー
+        function buttonStartHandler() {
+            //form制御
+            controlForm("start");
+
+            let form = document.getElementsByTagName("form");
+            condParam = {
+                "<%= Setting.commonClSv.nanido %>": "",
+                "<%= Setting.commonClSv.hinsi %>": "",
+                "<%= Setting.commonClSv.shuffle %>": "",
+                "<%= Setting.commonClSv.proficiency %>": "",
+                "<%= Setting.commonClSv.dayElapsed %>": "",
+                "<%= Setting.commonClSv.question %>": "-1"
+            };
+
+            //条件をまとめるループ
+            for (const iterator of form[0]) {
+                //難易度の条件か
+                if (iterator.id.startsWith("cond_nanido_")) {
+                    condParam["<%= Setting.commonClSv.nanido %>"] += (iterator.checked ? "O" : "X");
+                }
+
+                //品詞の条件か
+                if (iterator.id.startsWith("cond_hinsi_")) {
+                    condParam["<%= Setting.commonClSv.hinsi %>"] += (iterator.checked ? "O" : "X");
+                }
+
+                //シャッフルの条件か
+                if (iterator.id == "cond_shuffle") {
+                    condParam["<%= Setting.commonClSv.shuffle %>"] += (iterator.checked ? "O" : "X");
+                }
+
+                //習熟度の条件か
+                if (iterator.id.startsWith("cond_proficiency_")) {
+                    condParam["<%= Setting.commonClSv.proficiency %>"] += (iterator.checked ? "O" : "X");
+                }
+
+                //確認経過日数の条件か
+                if (iterator.id.startsWith("cond_dayElapsed_")) {
+                    condParam["<%= Setting.commonClSv.dayElapsed %>"] += (iterator.checked ? "O" : "X");
+                }
+            }
+
+            timeAnswer = -1;
+            indexQuestion = 0;
+
+            //NEXTボタンハンドラー
+            buttonNextHandler();
+
+            return;
+        }
+
+        //NEXTボタンハンドラー
+        async function buttonNextHandler() {
+            document.getElementById("buttonAnswer").disabled = true;
+
+            //タイマーが使われているか
+            if (timer != -1) {
+                clearTimeout(timer);
+            }
+
+            let resultParam = {};
+
+            //経過時間があるか
+            if (timeAnswer != -1) {
+                resultParam["<%= Setting.commonClSv.headword %>"] = document.getElementById("headword").value;
+                resultParam["<%= Setting.commonClSv.timeAnswer %>"] = timeAnswer.toString();
+            }
+
+            timeAnswer = 0;
+
+            //1問目か
+            if (indexQuestion == 0) {
+                ajaxParam = {
+                    ...resultParam,
+                    ...condParam
+                };
+            }
+            else {
+                ajaxParam = resultParam;
+                document.getElementById("history").value += document.getElementById("headword").value + "\n" + jsonRes.answer + "\n";
+            }
+
+            document.getElementById("headword").value = "";
+            document.getElementById("answer").value = "";
+            document.getElementById("info").innerText = "問題取得中";
+
+            //ajax呼び出し準備
+            let ajaxRes = await callAjax({
+                "order": "getQuestion"
+            });
+
+            jsonRes = JSON.parse(ajaxRes);
+            DEBUGForValue("jsonRes.headword", jsonRes["<%= Setting.commonClSv.headword %>"]);
+
+            //レスポンスにトークンがあるか
+            if (jsonRes.hasOwnProperty("<%= Setting.commonClSv.token %>")) {
+                session = jsonRes["<%= Setting.commonClSv.token %>"];
+            }
+
+            //レスポンスに問題数があるか
+            if (jsonRes.hasOwnProperty("<%= Setting.commonClSv.countQuestion %>")) {
+                countQuestion = jsonRes["<%= Setting.commonClSv.countQuestion %>"];
+            }
+
+            //最後の問題だったか
+            if (jsonRes["<%= Setting.commonClSv.headword %>"] == "-") {
+                //1問目だったか
+                if (indexQuestion == 0) {
+                    alert("条件を満たす問題がありません。");
+                }
+
+                document.getElementById("buttonNext").disabled = true;
+                document.getElementById("buttonAnswer").disabled = true;
+                document.getElementById("info").innerText = "確認終了";
+                isAnswering = false;
+            } else {
+                document.getElementById("info").innerText = "問題 " + (indexQuestion + 1).toString() + " / " + countQuestion;
+                document.getElementById("headword").value = jsonRes["<%= Setting.commonClSv.headword %>"];
+                document.getElementById("time").innerText = timeAnswer.toString();
+                document.getElementById("buttonAnswer").disabled = false;
+                isAnswering = true;
+                indexQuestion++;
+                timer = setTimeout(elap, 500);
+            }
+
+            return;
+        }
+
+        //タイマーハンドラー
+        function elap() {
+            //時間切れか
+            if (timeAnswer == 19) {
+                document.getElementById("answer").value = jsonRes["<%= Setting.commonClSv.answer %>"];
+                isAnswering = false;
+                return;
+            }
+
+            timeAnswer++;
+
+            //秒刻みか
+            if (timeAnswer % 2 == 0) {
+                document.getElementById("time").innerText = (timeAnswer / 2).toString();
+            }
+
+            timer = setTimeout(elap, 500);
+            return;
+        }
+
+        //ANSWERボタンハンドラー
+        function buttonAnswerHandler() {
+            //タイマーが使われているか
+            if (timer != -1) {
+                clearTimeout(timer);
+            }
+
+            document.getElementById("answer").value = jsonRes["<%= Setting.commonClSv.answer %>"];
+            isAnswering = false;
+            return;
+        }
+
+        //DOWNLOADボタンハンドラー
+        async function buttonDownloadHandler() {
+            //マルチーユーザーモードか
+            if (eval("<%= Setting.multiUser %>")) {
+                alert("マルチユーザーモードでは使えません。")
+            } else {
+                //ajax呼び出し準備
+                let ajaxRes = await callAjax({
+                    "order": "download"
+                });
+                let blob = new Blob([ajaxRes], { type: "text/csv" });
+                let hiddenDownload = document.createElement("a");
+                hiddenDownload.download = "wordlist.csv";
+                hiddenDownload.href = URL.createObjectURL(blob);
+                hiddenDownload.click();
+                hiddenDownload.remove();
+            }
+
+            return;
+        }
+
+        //UPLOADボタンハンドラー
+        async function buttonUploadHandler() {
+            //マルチーユーザーモードか
+            if (eval("<%= Setting.multiUser %>")) {
+                alert("マルチユーザーモードでは使えません。")
+            } else {
+                let fileUpload = document.getElementById("fileUpload");
+
+                //ファイルが指定されていないか
+                if (fileUpload.value == "") {
+                    alert("アップロードするファイルを選択して下さい。");
+                    return;
+                }
+
+                //上書き確認NGか
+                if (!confirm("データを上書きして良いですか?")) {
+                    return;
+                }
+
+                let formUpload = new FormData();
+                formUpload.append("<%= Setting.commonClSv.file %>", fileUpload.files[0]);
+                //ajax呼び出し準備
+                let ajaxRes = await callAjax({
+                    "order": "upload",
+                    "method": "post",
+                    "data": formUpload
+                });
+            }
+
+            return;
+        }
+
+        //チェックボックス一括設定ハンドラー
+        function controlCheckbox(params) {
+            let type;
+            let id = this.getAttribute("id");
+            let classname = this.getAttribute("class");
+            let elements = document.getElementsByClassName(classname);
+
+            //チェックボックスを一括設定するループ
+            for (const iterator of elements) {
+                type = iterator.getAttribute("type");
+
+                //チェックボックスか
+                if (type == "checkbox") {
+                    iterator.checked = id.includes("AllOn") ? true : false;
+                }
+            }
+
+            return;
+        }
+
+        //発音ボタンハンドラー
+        async function buttonPronunciationHandler() {
+            let text = document.getElementById("headword").value;
+            open("https://translate.google.co.jp/?text=" + text);
+            return;
+        }
+
+        //使い方ボタンハンドラー
+        async function buttonHelpHandler() {
+            alert("\
+            条件を指定してSTARTボタンを押す。\n\
+            (難易度は下記。\n\
+            http://www.cefr-j.org/download.html)\n\
+            問題に表示される単語の意味がわかったらNEXTボタンを押し、\n\
+            わからなければANSWERボタンを押す。\n\
+            (10秒経過するとANSWERボタン押下と同じになる。)\n\
+            やめる時はSTOPボタンを押す。")
+            return;
+        }
+    </script>
+</head>
+
+<body>
+    <style>
+        table {
+            width: 100%
+        }
+
+        .table_button {
+            text-align: center
+        }
+    </style>
+    <form>
+        利用した場合の一切の責任を私は負いません。<br>
+        <input type="button" id="buttonHelp" value="使い方"><br>
+        <b><label id="mode">モード：</label><%= Setting.multiUser ? "マルチユーザー" : "シングルユーザー" %></b><br>
+        <b><label id="condition">条件：</label></b><br>
+        難易度<input type="button" class="nanido" id="buttonNanidoAllOn" value="ALL ON"><input type="button" class="nanido"
+            id="buttonNanidoAllOff" value="ALL OFF"><br>
+        <table>
+            <tr>
+                <%
+            //難易度form作成ループ
+            for (const key in Setting.condition.nanido) {
+                %>
+                <td><input type="checkbox" class="nanido" id="cond_nanido_<%= key %>"
+                        <%= Setting.condition.nanido[key] %>><%= key %>
+                </td>
+                <%
+                }
+                %>
+            </tr>
+        </table>
+        <br>
+        品詞<input type="button" class="hinsi" id="buttonHinsiAllOn" value="ALL ON"><input type="button" class="hinsi"
+            id="buttonHinsiAllOff" value="ALL OFF"><br>
+        <table>
+            <%
+            var count = 0;
+            //品詞form作成ループ
+            for (const key in Setting.condition.hinsi) {
+                //行頭か
+                if (count % 4 == 0) {
+            %>
+            <tr>
+                <%
+                }
+                %>
+                <td><input type="checkbox" class="hinsi" id="cond_hinsi_<%= key %>"
+                        <%= Setting.condition.hinsi[key][1] %>><%= Setting.condition.hinsi[key][0] %></td>
+                <%
+                //行末か
+                if (count % 4 == 3) {
+                %>
+            </tr>
+            <tr>
+                <td>&nbsp;</td>
+            </tr>
+            <%
+                }
+
+                count++;
+            }
+            %>
+        </table>
+        順序　<input type="checkbox" id="cond_shuffle" <%= Setting.condition.shuffle %>>シャッフル<br>
+        <br>
+        習熟度(答えるのに何秒以上かかったか。ANSWERボタン押下は最長扱い。)<br>
+        <input type="button" class="proficiency" id="buttonProficiencyAllOn" value="ALL ON"><input type="button"
+            class="proficiency" id="buttonProficiencyAllOff" value="ALL OFF"><br>
+        ※マルチユーザーモードでは使えません。
+        <table>
+            <tr>
+                <%
+                //習熟度form作成ループ
+                for (const key in Setting.condition.proficiency) {
+                %>
+                <td><input type="checkbox" class="proficiency" id="cond_proficiency_<%= key %>"
+                        <%= Setting.condition.proficiency[key][1] %>><%= Setting.condition.proficiency[key][0] %>
+                </td>
+                <%
+                }
+                %>
+            </tr>
+        </table>
+        <br>
+        確認経過日数<input type="button" class="dayElapsed" id="buttonDayElapsedAllOn" value="ALL ON"><input type="button"
+            class="dayElapsed" id="buttonDayElapsedAllOff" value="ALL OFF"><br>
+        ※マルチユーザーモードでは使えません。
+        <table>
+            <tr>
+                <%
+                //確認経過日数form作成ループ
+                for (const key in Setting.condition.dayElapsed) {
+                %>
+                <td><input type="checkbox" class="dayElapsed" id="cond_dayElapsed_<%= key %>"
+                        <%= Setting.condition.dayElapsed[key][1] %>><%= Setting.condition.dayElapsed[key][0] %>
+                </td>
+                <%
+                }
+                %>
+            </tr>
+        </table>
+        <br>
+        <div hidden>
+            問題数
+            <select id="cond_question">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+            </select>
+            <hr>
+        </div>
+        <table valign="center">
+            <tr>
+                <td class="table_button"><input type="button" id="buttonStart" value="START"></td>
+                <td class="table_button"><input type="button" id="buttonStop" value="STOP"></td>
+                <td class="table_button"><input type="button" id="buttonDownload" value="DOWNLOAD"></td>
+                <td class="table_button"><input type="file" id="fileUpload" value="" accept="text/csv"></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td class="table_button"><input type="button" id="buttonUpload" value="UPLOAD"></td>
+            </tr>
+        </table>
+        <hr>
+        <b>問題：</label></b><br>
+        <label id="info"></label><br>
+        単語<input type="text" id="headword" value="" size="40" readonly><label id="time">&nbsp;</label>秒経過<input
+            type="button" id="buttonPronunciation" value="発音(google)"><br>
+        <table valign="center">
+            <tr>
+                <td class="table_button"><input type="button" id="buttonNext" value="NEXT"></td>
+                <td class="table_button"><input type="button" id="buttonAnswer" value="ANSWER"></td>
+            </tr>
+        </table>
+        答え<br>
+        <textarea id="answer" cols="40" rows="10" wrap="off" readonly></textarea><br>
+        問題履歴<br>
+        <textarea id="history" cols="40" rows="10" wrap="off" readonly></textarea><br>
+        <a href="/LICENSE">LICENSE</a>
+    </form>
+    <script>
+        //初期化
+        initialize();
+    </script>
+</body>
+
+</html>
