@@ -1,6 +1,6 @@
 {
     "debug": "ON",
-    "multiUser": true,
+    "multiUser": false,
     "maxUser": 3,
     "condition": {
         "nanido": {

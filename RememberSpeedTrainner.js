@@ -274,6 +274,15 @@ App.get(Setting.nodejs.urlAjaxGetQuestion,
 
             fs.renameSync(CSVFILE, CSVFILEBACKUP);
             let listWordCsv = json2csv(listWord);
+            let listWordCsvCrLf = [];
+
+            //Windows改行にするループ
+            // LibreCalcが改行のカスタマイズができないため
+            for (const iterator of listWordCsv.split("\n")) {
+                listWordCsvCrLf.push(iterator.replace(/\n$/, ""));
+            }
+
+            listWordCsv = listWordCsvCrLf.join("\r\n");
             fs.writeFileSync(CSVFILE, listWordCsv);
         }
 

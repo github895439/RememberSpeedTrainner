@@ -343,7 +343,7 @@
             }
             else {
                 ajaxParam = resultParam;
-                document.getElementById("history").value += document.getElementById("headword").value + "\n" + jsonRes.answer + "\n";
+                document.getElementById("history").value = document.getElementById("headword").value + "\n" + jsonRes.answer + "\n" + document.getElementById("history").value;
             }
 
             document.getElementById("headword").value = "";
