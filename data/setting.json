@@ -96,6 +96,14 @@
             "elap9sToMax": [
                 "9秒以上",
                 "checked"
+            ],
+            "notd": [
+                "未確認",
+                "checked"
+            ],
+            "nota": [
+                "対象外",
+                "checked"
             ]
         },
         "dayElapsed": {
@@ -104,19 +112,11 @@
                 "checked"
             ],
             "last10d": [
-                "10日未満",
+                "1日以上10日未満",
                 "checked"
             ],
-            "done": [
-                "確認済み",
-                "checked"
-            ],
-            "notd": [
-                "未確認",
-                "checked"
-            ],
-            "nota": [
-                "対象外",
+            "over10d": [
+                "10日以上",
                 "checked"
             ]
         },

@@ -421,28 +421,28 @@ function getListQuestion(params, now) {
                     return false;
                 }
 
+                //未確認外条件、かつ、該当か
+                if ((params[Setting.commonClSv.proficiency].charAt(5) == "X") && (value.proficiency == -1)) {
+                    return false;
+                }
+
+                //対象外外条件、かつ、該当か
+                if ((params[Setting.commonClSv.proficiency].charAt(6) == "X") && (value.proficiency == -2)) {
+                    return false;
+                }
+
                 //1日未満外条件、かつ、該当か
                 if ((params[Setting.commonClSv.dayElapsed].charAt(0) == "X") && (value.last_check + MS1DAY >= now)) {
                     return false;
                 }
 
-                //10日未満外条件、かつ、該当か
+                //1日以上10日未満外条件、かつ、該当か
                 if ((params[Setting.commonClSv.dayElapsed].charAt(1) == "X") && (value.last_check + MS1DAY < now) && (value.last_check + MS10DAY >= now)) {
                     return false;
                 }
 
-                //確認済み外条件、かつ、該当か
-                if ((params[Setting.commonClSv.dayElapsed].charAt(2) == "X") && ((value.proficiency == -1) || (value.proficiency == -2))) {
-                    return false;
-                }
-
-                //未確認外条件、かつ、該当か
-                if ((params[Setting.commonClSv.dayElapsed].charAt(3) == "X") && (value.proficiency == -1)) {
-                    return false;
-                }
-
-                //対象外外条件、かつ、該当か
-                if ((params[Setting.commonClSv.dayElapsed].charAt(4) == "X") && (value.proficiency == -2)) {
+                //10日以上外条件、かつ、該当か
+                if ((params[Setting.commonClSv.dayElapsed].charAt(2) == "X") && (value.last_check + MS10DAY < now)) {
                     return false;
                 }
             }

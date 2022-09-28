@@ -565,7 +565,7 @@
             for (const key in Setting.condition.hinsi) {
                 //行頭か
                 if (count % 4 == 0) {
-            %>
+                %>
             <tr>
                 <%
                 }
@@ -598,11 +598,28 @@
                 <%
                 //習熟度form作成ループ
                 for (const key in Setting.condition.proficiency) {
+                //行頭か
+                if (count % 4 == 0) {
+            %>
+            <tr>
+                <%
+                }
                 %>
                 <td><input type="checkbox" class="proficiency" id="cond_proficiency_<%= key %>"
                         <%= Setting.condition.proficiency[key][1] %>><%= Setting.condition.proficiency[key][0] %>
                 </td>
                 <%
+                //行末か
+                if (count % 4 == 3) {
+                %>
+            </tr>
+            <tr>
+                <td>&nbsp;</td>
+            </tr>
+            <%
+                }
+
+                count++;
                 }
                 %>
             </tr>
