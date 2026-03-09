@@ -1,0 +1,10 @@
+{
+    "dependencies": {
+        "async-lock": "^1.4.1",
+        "ejs": "^5.0.1",
+        "jsonwebtoken": "^9.0.3",
+        "linq": "^4.0.3",
+        "multer": "^2.0.1",
+        "qs": "^6.15.0"
+    }
+}
