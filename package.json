@@ -1,4 +1,15 @@
 {
+    "name": "RememberSpeedTrainner",
+    "version": "1.0.0",
+    "description": "RememberSpeedTrainner",
+    "main": "RememberSpeedTrainner.js",
+    "repository": "https://github.com/github895439/RememberSpeedTrainner",
+    "author": "KEY",
+    "license": "MIT",
+    "private": false,
+    "scripts": {
+        "start": "node .\\RememberSpeedTrainner.js"
+    },
     "dependencies": {
         "express": "^5.2.1",
         "async-lock": "^1.4.1",
